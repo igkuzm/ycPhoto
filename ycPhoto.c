@@ -7,7 +7,9 @@
  */
 
 #include "ycPhoto.h"
+#include "cYandexDisk/cYandexDisk.h"
 #include "stb/stb_image_resize.h"
+#include <stdio.h>
 
 #define STBIW_ASSERT(x)
 #define STBIR_ASSERT(x)
@@ -31,38 +33,106 @@
 #define STR(...) ({char ___str[BUFSIZ]; sprintf(___str, __VA_ARGS__); ___str;})
 #define STRCOPY(str0, str1) ({size_t ___size = sizeof(str0); strncpy(str0, str1, ___size - 1); str0[___size - 1] = '\0';})
 
+static void * yc_photo_upload_progress_data = NULL;
+static int yc_photo_upload_progress_callback(void *clientp, double dltotal, double dlnow, double ultotal, double ulnow) {
+	return 0;
+}
 
-int yc_photo_thumbinail_from_jpeg_file(const char *filename, const char *thumbinail_filename, char **error){
+int yc_photo_thumbinail_from_jpeg_file(const char * image_path, const char * thumbinail_path, char **error){
 	int err = 0; //error to return
 	int x, y, n; //x - widhth, y - height, n - components per pixel (eg. 3 for rgb)
 	
 	//reading data
-	unsigned char *file_data = stbi_load(filename, &x, &y, &n, 0);
+	unsigned char *file_data = stbi_load(image_path, &x, &y, &n, 0);
 
 	//allocate memmory for output data
-	void *output_data_ptr =	malloc(128*128*BUFSIZ);
-	if (output_data_ptr == NULL) { //check of allocating memory
-		perror("Malloc output_data_ptr");
-		exit(EXIT_FAILURE);	
-	}
-	unsigned char *output_data = (unsigned char *)output_data_ptr; //assign data 
+	unsigned char *output_data = MALLOC(128*128*BUFSIZ);
 
 	//resize image
 	err = stbir_resize_uint8(file_data, x, y, 0, output_data, 128, 128, 0, n);
 	if (err != 1) {
-		ERROR(error, "ycPhoto ERROR: can't resize image: %s\n", filename);
+		ERROR(error, "ycPhoto ERROR: can't resize image: %s\n", image_path);
 		return 1;
 	}
 
 	//write image tumbinail to JPEG file
-	err = stbi_write_jpg(thumbinail_filename, 128, 128, n, output_data, 100);
+	err = stbi_write_jpg(thumbinail_path, 128, 128, n, output_data, 100);
 	if (err != 1) {
-		ERROR(error, "ycPhoto ERROR: can't write thumbinail data\n");
+		ERROR(error, "ycPhoto ERROR: can't write thumbinail data to: %s\n", thumbinail_path);
 		return 1;
 	}
 
 	free(output_data); //no need data
 	free(file_data);
 
+	return 0;
+}
+
+typedef struct yc_photo_upload_photo_data {
+	void *user_data;
+	int (*callback)(void *user_data, char *error);	
+	char comment[BUFSIZ];
+	char token[BUFSIZ];
+	char path[BUFSIZ];
+} yc_photo_upload_photo_data;
+
+int yc_photo_upload_photo_callback(size_t size, void *user_data, char *error)
+{
+	struct yc_photo_upload_photo_data *data = user_data;
+	if (error)
+		data->callback(data->user_data, error);	
+
+	char *_error = NULL;
+	//c_yandex_disk_patch(data->token, data->path, data->comment, &_error);
+	if (_error)
+		data->callback(data->user_data, _error);	
+
+
+	free(user_data);
+	return 0;
+}
+
+int yc_photo_upload_photo(const char * yandex_disk_token, long companyId, int clientId, int eventId, const char * image_path, const char * thumbinail_path, const char * uuid, const char * comment, void * user_data, int (*callback)(void *user_data, char *error))
+{
+
+	//create thumbinail
+	char *error = NULL;
+	yc_photo_thumbinail_from_jpeg_file(image_path, thumbinail_path, &error);
+	if (error) {
+		callback(user_data, error);
+		return -1;
+	}
+	char *paths[] = {"photos", "thumbs"};
+	const char *image;
+	for (int i = 0; i < 2; ++i) {
+		char *error = NULL;
+		//create directory
+		char path[BUFSIZ];
+		sprintf(path, "app:/%s_%ld_%d_%d", paths[i], companyId, clientId, eventId);
+		c_yandex_disk_mkdir(yandex_disk_token, path, &error);
+		if (error)
+			callback(user_data, error);
+		
+		//set image comment
+		char comment_json[BUFSIZ];
+		sprintf(comment_json, "{\"comment_ids\":{\"private_resource\":\"%s\", \"public_resource\":\"%s\"}}", comment, comment);
+
+		//set image path
+		sprintf(path, "%s/%s.jpeg", path, uuid);
+	
+		//set data for callback
+		struct yc_photo_upload_photo_data *data = NEW(yc_photo_upload_photo_data);
+		data->user_data = user_data;
+		data->callback = callback;
+		strcpy(data->comment, comment_json);
+		strcpy(data->token, yandex_disk_token);
+		strcpy(data->path, path);
+		
+		//upload image
+		if (i == 0) image = image_path;
+		if (i == 1) image = thumbinail_path;
+		c_yandex_disk_upload_file(yandex_disk_token, image, path, data, yc_photo_upload_photo_callback, yc_photo_upload_progress_data, yc_photo_upload_progress_callback);
+
+	}
 	return 0;
 }

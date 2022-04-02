@@ -6,7 +6,7 @@
 
 
 all:
-	mkdir -p build && cd build && cmake -DBUILD_TEST="1" .. && make && open ycPhoto_test
+	mkdir -p build && cd build && cmake -DycPhoto_BUILD_TEST="1" .. && make && open ycPhoto_test
 
 
 clean:

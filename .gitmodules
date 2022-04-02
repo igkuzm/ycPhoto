@@ -1,0 +1,3 @@
+[submodule "cYandexDisk"]
+	path = cYandexDisk
+	url = https://github.com/igkuzm/cYandexDisk

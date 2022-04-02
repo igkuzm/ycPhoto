@@ -9,9 +9,13 @@ project(
 	LANGUAGES C 
 )
 
-add_library(${TARGET} STATIC ycPhoto.c)
+set(CYANDEXDISK_SOURCE_DIR ${CMAKE_SOURCE_DIR}/cYandexDisk)
+add_subdirectory(${CYANDEXDISK_SOURCE_DIR})
 
-if(${BUILD_TEST})
+add_library(${TARGET} STATIC ycPhoto.c)
+target_link_libraries(${TARGET} cYandexDisk)
+
+if(${ycPhoto_BUILD_TEST})
 	add_executable(ycPhoto_test test.c)
 	target_link_libraries(ycPhoto_test ${TARGET})
 endif()
