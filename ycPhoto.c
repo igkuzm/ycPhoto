@@ -83,10 +83,9 @@ int yc_photo_upload_photo_callback(size_t size, void *user_data, char *error)
 		data->callback(data->user_data, error);	
 
 	char *_error = NULL;
-	//c_yandex_disk_patch(data->token, data->path, data->comment, &_error);
+	c_yandex_disk_patch(data->token, data->path, data->comment, &_error);
 	if (_error)
 		data->callback(data->user_data, _error);	
-
 
 	free(user_data);
 	return 0;
@@ -102,37 +101,36 @@ int yc_photo_upload_photo(const char * yandex_disk_token, long companyId, int cl
 		callback(user_data, error);
 		return -1;
 	}
-	char *paths[] = {"photos", "thumbs"};
-	const char *image;
+	
+	//set image comment
+	char comment_json[BUFSIZ];
+	sprintf(comment_json, "{\"comment_ids\":{\"private_resource\":\"%s\", \"public_resource\":\"%s\"}}", comment, comment);
+		
+	char *paths[] = {"photo", "thumbinails"};
 	for (int i = 0; i < 2; ++i) {
 		char *error = NULL;
 		//create directory
 		char path[BUFSIZ];
-		sprintf(path, "app:/%s_%ld_%d_%d", paths[i], companyId, clientId, eventId);
+		sprintf(path, "app:/%ld_%d_%d_%s", companyId, clientId, eventId, paths[i]);
 		c_yandex_disk_mkdir(yandex_disk_token, path, &error);
 		if (error)
 			callback(user_data, error);
-		
-		//set image comment
-		char comment_json[BUFSIZ];
-		sprintf(comment_json, "{\"comment_ids\":{\"private_resource\":\"%s\", \"public_resource\":\"%s\"}}", comment, comment);
-
-		//set image path
-		sprintf(path, "%s/%s.jpeg", path, uuid);
 	
 		//set data for callback
-		struct yc_photo_upload_photo_data *data = NEW(yc_photo_upload_photo_data);
+		struct yc_photo_upload_photo_data *data = NEW(yc_photo_upload_photo_data); //allocate memory as run in thread
 		data->user_data = user_data;
 		data->callback = callback;
-		strcpy(data->comment, comment_json);
-		strcpy(data->token, yandex_disk_token);
-		strcpy(data->path, path);
+		STRCOPY(data->comment, comment_json);
+		STRCOPY(data->token, yandex_disk_token);
 		
-		//upload image
-		if (i == 0) image = image_path;
+		//set image path
+		sprintf(path, "%s/%s.jpeg", path, uuid);
+		STRCOPY(data->path, path);
+
+		const char *image = image_path;
 		if (i == 1) image = thumbinail_path;
 		c_yandex_disk_upload_file(yandex_disk_token, image, path, data, yc_photo_upload_photo_callback, yc_photo_upload_progress_data, yc_photo_upload_progress_callback);
-
 	}
+
 	return 0;
 }
