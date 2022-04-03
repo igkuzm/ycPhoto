@@ -127,9 +127,10 @@ struct yc_photo_upload_photo_data {
 
 int yc_photo_upload_photo_callback(size_t size, void *user_data, char *error)
 {
-	struct yc_photo_upload_photo_data *data = user_data;
+	struct yc_photo_upload_photo_data *d = user_data;
 	if (error)
-		data->callback(data->user_data, error);	
+		if (d->callback)
+			d->callback(d->user_data, error);	
 
 	free(user_data);
 	return 0;
@@ -161,7 +162,8 @@ void *yc_photo_upload_photo_in_thread(void *_params){
 	sprintf(dir_path, "app:/%u", params->companyId);
 	c_yandex_disk_mkdir(params->yandex_disk_token, dir_path, &error);	
 	if (error) {
-		params->callback(params->user_data, error);
+		if (params->callback)
+			params->callback(params->user_data, error);
 		free(error);
 	}
 
@@ -169,7 +171,8 @@ void *yc_photo_upload_photo_in_thread(void *_params){
 	sprintf(dir_path, "%s/%u", dir_path, params->clientId);
 	c_yandex_disk_mkdir(params->yandex_disk_token, dir_path, &error);	
 	if (error){
-		params->callback(params->user_data, error);	
+		if (params->callback)
+			params->callback(params->user_data, error);	
 		free(error);
 	}
 
@@ -177,7 +180,8 @@ void *yc_photo_upload_photo_in_thread(void *_params){
 	sprintf(dir_path, "%s/%u", dir_path, params->eventId);
 	c_yandex_disk_mkdir(params->yandex_disk_token, dir_path, &error);	
 	if (error){
-		params->callback(params->user_data, error);	
+		if (params->callback)
+			params->callback(params->user_data, error);	
 		free(error);
 	}	
 
@@ -185,7 +189,8 @@ void *yc_photo_upload_photo_in_thread(void *_params){
 	sprintf(dir_path, "%s/%s", dir_path, params->uuid);
 	c_yandex_disk_mkdir(params->yandex_disk_token, dir_path, &error);	
 	if (error){
-		params->callback(params->user_data, error);	
+		if (params->callback)
+			params->callback(params->user_data, error);	
 		free(error);
 	}	
 	
@@ -240,7 +245,8 @@ yc_photo_add(
 	uuid4_seed(&state);
 	uuid4_gen(&state, &identifier);
 	if (!uuid4_to_s(identifier, uuid, 37)){
-		callback(user_data, "ycPhoto: Can't genarate UUID");
+		if (callback)
+			callback(user_data, "ycPhoto: Can't genarate UUID");
 		return NULL;
 	}
 
@@ -249,7 +255,8 @@ yc_photo_add(
 	void *thumb_data;
 	int thumb_size = yc_photo_thumbinail_data_from_jpeg_file(image_path, &thumb_data, &error);
 	if (error) {
-		callback(user_data, error);
+		if (callback)
+			callback(user_data, error);
 		return NULL;
 	}
 
@@ -260,7 +267,8 @@ yc_photo_add(
 	//получаем дефолтные значения атрибутов
 	int err = pthread_attr_init(&attr);
 	if (err) {
-		callback(user_data, STR("ycPhoto: Can't init THREAD attributes\n"));
+		if (callback)
+			callback(user_data, STR("ycPhoto: Can't init THREAD attributes\n"));
 		return NULL;
 	}	
 
@@ -283,7 +291,8 @@ yc_photo_add(
 	//создаем новый поток
 	err = pthread_create(&tid,&attr, yc_photo_upload_photo_in_thread, params);
 	if (err) {
-		callback(user_data, STR("ycPhoto: Can't create THREAD\n"));
+		if (callback)
+			callback(user_data, STR("ycPhoto: Can't create THREAD\n"));
 		return NULL;
 	}
 
@@ -318,7 +327,8 @@ yc_photo_remove(
 	
 	c_yandex_disk_rm(yandex_disk_token, dir_path, &error);	
 	if (error) {
-		callback(user_data, error);
+		if (callback)
+			callback(user_data, error);
 		free(error);
 	}
 
@@ -334,7 +344,8 @@ yc_photo_set_comment_callback(size_t size, void *user_data, char *error)
 {
 	struct yc_photo_set_comment_callback_t *t = user_data;
 	if (error) {
-		t->callback(t->user_data, error);
+		if (t->callback)
+			t->callback(t->user_data, error);
 		free(error);
 	}
 
@@ -366,7 +377,8 @@ yc_photo_set_comment(
 	
 	c_yandex_disk_rm(yandex_disk_token, dir_path, &error);	
 	if (error) {
-		callback(user_data, error);
+		if (callback)
+			callback(user_data, error);
 		free(error);
 	}
 
@@ -389,7 +401,8 @@ int yc_photo_list_download_thumb_callback(size_t size, void *data, void *user_da
 	if (size) {
 		d->photo->data = data;
 		d->photo->size = size;
-		d->callback(d->photo, d->user_data, NULL);
+		if (d->callback)
+			d->callback(d->photo, d->user_data, NULL);
 	}
 
 	return 0;
@@ -408,7 +421,8 @@ int yc_photo_list_callback(c_yd_file_t *file, void *user_data, char *error)
 {
 	struct yc_photo_list_callback_data *d = user_data;	
 	if (error)
-		d->callback(NULL, d->user_data, error);
+		if (d->callback)
+			d->callback(NULL, d->user_data, error);
 
 	if (file) {
 		
