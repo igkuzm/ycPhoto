@@ -215,7 +215,7 @@ void *yc_photo_upload_photo_in_thread(void *_params){
 	struct yc_photo_upload_photo_data *data = NEW(struct yc_photo_upload_photo_data); //allocate memory as run in thread
 	data->user_data = params->user_data;
 	data->callback = params->callback;	
-	c_yandex_disk_upload_data(params->yandex_disk_token, params->comment, strlen(params->comment), path, data, yc_photo_upload_photo_callback, params->clientp, params->progress_callback);	
+	c_yandex_disk_upload_data(params->yandex_disk_token, (void *)params->comment, strlen(params->comment), path, data, yc_photo_upload_photo_callback, params->clientp, params->progress_callback);	
 
 	free(params);
 	pthread_exit(0);	
@@ -273,8 +273,8 @@ yc_photo_add(
 	STRCOPY(params->image_path , image_path);
 	params->thumb_data = thumb_data;
 	params->thumb_size = thumb_size;
-	STRCOPY(params->uuid , uuid);
-	STRCOPY(params->comment , comment);
+	STRCOPY(params->uuid, uuid);
+	STRCOPY(params->comment, comment);
 	params->user_data = user_data;
 	params->callback = callback;
 	params->clientp = clientp;
@@ -322,6 +322,58 @@ yc_photo_remove(
 		free(error);
 	}
 
+}
+
+struct yc_photo_set_comment_callback_t {
+	void *user_data;
+	int (*callback)(void *user_data, char *error);
+};
+
+int 
+yc_photo_set_comment_callback(size_t size, void *user_data, char *error)
+{
+	struct yc_photo_set_comment_callback_t *t = user_data;
+	if (error) {
+		t->callback(t->user_data, error);
+		free(error);
+	}
+
+	free(t);
+
+	return 0;
+}
+
+void 
+yc_photo_set_comment(
+		const char * yandex_disk_token, //autorization token for Yandex Disk
+		unsigned int companyId,         //yclients company id
+		unsigned int clientId,          //yclients client id
+		unsigned int eventId,           //yclients event id
+		const char * uuid,				//uuid of photo
+		const char * comment,				
+		void * user_data,               //pointer to transfer trow callback
+		int (*callback)(
+			void *user_data,
+			char *error
+		)
+)
+{
+	char dir_path[BUFSIZ];
+	
+	sprintf(dir_path, "app:/%u/%u/%u/%s/comment.txt", companyId, clientId, eventId, uuid);
+	
+	char *error = NULL;
+	
+	c_yandex_disk_rm(yandex_disk_token, dir_path, &error);	
+	if (error) {
+		callback(user_data, error);
+		free(error);
+	}
+
+	struct yc_photo_set_comment_callback_t *t = NEW(struct yc_photo_set_comment_callback_t);
+	t->callback = callback;
+	t->user_data = user_data;
+	c_yandex_disk_upload_data(yandex_disk_token, (void *)comment, strlen(comment), dir_path, t, yc_photo_set_comment_callback, NULL, NULL);
 }
 
 

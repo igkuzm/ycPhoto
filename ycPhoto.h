@@ -52,6 +52,21 @@ void yc_photo_remove(
 		)
 );
 
+//remove photo from base
+void yc_photo_set_comment(
+		const char * yandex_disk_token, //autorization token for Yandex Disk
+		unsigned int companyId,         //yclients company id
+		unsigned int clientId,          //yclients client id
+		unsigned int eventId,           //yclients event id
+		const char * uuid,				//uuid of photo
+		const char * comment,			//new comment
+		void * user_data,               //pointer to transfer trow callback
+		int (*callback)(
+			void *user_data,
+			char *error
+		)
+);
+
 //run callback for each photo for eventid
 void yc_photo_for_each(
 		const char * yandex_disk_token, //autorization token for Yandex Disk
